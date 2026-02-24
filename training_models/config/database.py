@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker
 )
-from src.training_models.config.settings import settings
+from training_models.config.settings import settings
 
 engine = create_async_engine(
     settings.SQL_DATABASE_URL,

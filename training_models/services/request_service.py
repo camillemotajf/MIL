@@ -1,4 +1,4 @@
-from src.training_models.repositories.request_repository import RequestsRepository
+from training_models.repositories.request_repository import RequestsRepository
 from typing import Tuple, List, Dict
 
 class RequestService:

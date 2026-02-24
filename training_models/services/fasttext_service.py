@@ -5,9 +5,9 @@ import pandas as pd
 from typing import Tuple, List, Dict
 from gensim.models import FastText
 
-from src.tokenization.http_tokens import create_vocabulary
-from src.training_models.repositories.request_repository import RequestsRepository
-from src.training_models.repositories.campaigns_repository import CampaignRepository
+from tokenization.http_tokens import create_vocabulary
+from training_models.repositories.request_repository import RequestsRepository
+from training_models.repositories.campaigns_repository import CampaignRepository
 
 logger = logging.getLogger(__name__)
 logging.getLogger("gensim").setLevel(logging.WARNING) # Mantém o Gensim silencioso

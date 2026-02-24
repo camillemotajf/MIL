@@ -19,7 +19,8 @@ class RequestsRepository:
                   "request": True,
                   "decision": True,
                   '_id': True,
-                  "datetime": True
+                  "datetime": True,
+                  "ip": True
             }
 
             if rule_id:

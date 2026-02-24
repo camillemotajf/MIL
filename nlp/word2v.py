@@ -10,7 +10,7 @@ project_root = os.path.abspath(os.path.join(current_dir, '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
     
-from src.tokenization.http_tokens import create_request_vector
+from tokenization.http_tokens import create_request_vector
 
 
 cores = multiprocessing.cpu_count() 

@@ -1,4 +1,4 @@
-from src.training_models.repositories.campaigns_repository import CampaignRepository
+from training_models.repositories.campaigns_repository import CampaignRepository
 
 class CampaignService:
     def __init__(self, repository: CampaignRepository):

@@ -10,10 +10,12 @@ seaborn
 hdbscan
 umap-learn
 transformers
-sentence_transformers
+sentence-transformers
 requests
 kagglehub
 datasets
 motor
 asyncio
 aiomysql
+sqlalchemy
+pydantic_settings 

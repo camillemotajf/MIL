@@ -1,10 +1,10 @@
-from src.training_models.repositories.campaigns_repository import CampaignRepository
-from src.training_models.services.campaign_service import CampaignService
-from src.training_models.config.database import AsyncSessionLocal
+from training_models.repositories.campaigns_repository import CampaignRepository
+from training_models.services.campaign_service import CampaignService
+from training_models.config.database import AsyncSessionLocal
 
-from src.training_models.config.mongo import mongo_collection
-from src.training_models.repositories.request_repository import RequestsRepository
-from src.training_models.services.request_service import RequestService
+from training_models.config.mongo import mongo_collection
+from training_models.repositories.request_repository import RequestsRepository
+from training_models.services.request_service import RequestService
 
 
 campaign_repository = CampaignRepository(
