@@ -18,9 +18,9 @@ class RequestsRepository:
                   "headers": True,
                   "request": True,
                   "decision": True,
-                  '_id': True,
                   "datetime": True,
-                  "ip": True
+                  "ip": True,
+                  "ip_api_isp": True
             }
 
             if rule_id:
