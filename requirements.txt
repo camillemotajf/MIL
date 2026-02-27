@@ -1,3 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch
+torchvision
 pandas
 numpy
 matplotlib
@@ -18,4 +22,4 @@ motor
 asyncio
 aiomysql
 sqlalchemy
-pydantic_settings 
+pydantic-settings

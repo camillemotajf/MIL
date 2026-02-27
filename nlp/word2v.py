@@ -27,7 +27,6 @@ def create_X_embedding_ft(corpus, model=None):
                             workers=cores - 1
                         )
 
-    print(f"Using {cores - 1} out of {cores} cores")
     X_vectors = [
         create_request_vector(tokens, model)
         for tokens in tqdm(corpus, desc="Vetorizando")

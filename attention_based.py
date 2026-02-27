@@ -15,6 +15,8 @@ from torch.optim import AdamW
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
+from torch.optim import lr_scheduler
+
 
 # Supondo que essas importações já existam no seu projeto
 from data.embedding_service import EmbeddingService
@@ -67,21 +69,24 @@ class MILBagDatasetLogical(Dataset):
     def __init__(self, df_bags):
         self.bags = []
         self.bag_labels = []
-        self.bag_ids = []
+        self.ips = []
         
         for _, row in df_bags.iterrows():
-            bag_tensor = torch.tensor(row["embedding"], dtype=torch.float32)
-            label_tensor = torch.tensor([row["bag_label"]], dtype=torch.float32)
+            bag_array = np.array(row["embedding"]) 
+            bag_tensor = torch.tensor(bag_array, dtype=torch.float32)
+
+            label_array = np.array(row["bag_label"])
+            label_tensor = torch.tensor(label_array, dtype=torch.float32)
             
             self.bags.append(bag_tensor)
             self.bag_labels.append(label_tensor)
-            self.bag_ids.append(row["bag_id"])
+            self.ips.append(row["ip"])
 
     def __len__(self):
         return len(self.bags)
 
     def __getitem__(self, idx):
-        return self.bags[idx], self.bag_labels[idx], self.bag_ids[idx]
+        return self.bags[idx], self.bag_labels[idx], self.ips[idx]
     
 
 
@@ -104,6 +109,7 @@ class MILTrainingService:
         self.limit_cpg: int = 100
         self.limit_each: int = 10000
         self.device = device
+        print("Device: ", self.device)
         self.model = None
         self.le = LabelEncoder()
         
@@ -148,10 +154,10 @@ class MILTrainingService:
 
         mapeamento_mil = {"bots": 1, "unsafe": 0}
         # agrupamento por bloco de ip
-        df["ip_block"] = df["ip"].apply(self.extract_ip_stack)
-        df["ip_api_isp"] = df["ip_api_isp"].fillna("ip_unknow")
-        #3 bag id -> utilizando pelo MIL Dataset para agrupar
-        df["bag_id"] = df["ip_block"] + " | " + df["ip_api_isp"]
+        # df["ip_block"] = df["ip"].apply(self.extract_ip_stack)
+        # df["ip_api_isp"] = df["ip_api_isp"].fillna("ip_unknow")
+        # #3 bag id -> utilizando pelo MIL Dataset para agrupar
+        # df["bag_id"] = df["ip_block"] + " | " + df["ip_api_isp"]
 
         print(df.head())
 
@@ -163,10 +169,10 @@ class MILTrainingService:
         df["embedding"] = list(embeddings_matrix)
 
         logger.info("Agrupando requisições em Bags por Endereço IP...")
-        bags_df = df.groupby("bag_id").agg({
+        bags_df = df.groupby("ip").agg({
             "embedding": list,
             "decision_mil": list,
-            "ip": list
+            # "ip": list
         }).reset_index()
 
         bags_df["bag_label"] = bags_df["decision_mil"].apply(lambda labels: 1.0 if 1 in labels else 0.0)
@@ -193,8 +199,10 @@ class MILTrainingService:
         dataset_train = MILBagDatasetLogical(df_train)
         dataset_test = MILBagDatasetLogical(df_test)
 
-        train_loader = DataLoader(dataset_train, batch_size=1, shuffle=True)
-        test_loader = DataLoader(dataset_test, batch_size=1, shuffle=False)
+        usar_pin_memory = (self.device == 'cuda')
+
+        train_loader = DataLoader(dataset_train, batch_size=1, shuffle=True, num_workers=4, pin_memory=usar_pin_memory)
+        test_loader = DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=4, pin_memory=usar_pin_memory)
 
         logger.info(f"Gerados {len(dataset_train)} IPs para treino e {len(dataset_test)} IPs para teste.")
         return train_loader, test_loader, hash_info
@@ -207,20 +215,30 @@ class MILTrainingService:
         criterion = nn.BCELoss() 
 
         logger.info("Iniciando treinamento MIL...")
+
+        accumulation_steps = 16
         
         for epoch in range(epochs):
+            acumulated_loss = 0.0
+            optimizer.zero_grad()
+
             self.model.train()
             train_loss, train_preds, train_targets = 0.0, [], []
             
-            for bags, labels, _ in train_loader:
+            for i, (bags, labels, _) in enumerate(train_loader):
                 bags, labels = bags.to(self.device), labels.to(self.device)
-                optimizer.zero_grad()
                 
                 preds, _ = self.model(bags)
                 loss = criterion(preds, labels)
+                loss = loss / accumulation_steps
                 
                 loss.backward()
-                optimizer.step()
+
+                acumulated_loss += loss.item() * accumulation_steps
+
+                if (i + 1) % accumulation_steps == 0 or (i + 1) == len(train_loader):
+                    optimizer.step()       
+                    optimizer.zero_grad()
                 
                 train_loss += loss.item()
                 train_preds.extend((preds > 0.85).cpu().numpy())
