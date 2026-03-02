@@ -157,33 +157,52 @@ class MILTrainingService:
         train_loader, test_loader, hash_info = await self.generate_embeddings()
 
         logger.info("Instanciando a rede neural AttentionMIL...")
-        modelo = AttentionMIL(in_features=self.emb_dim, hidden_dim=hidden_dim).to(self.device)
+        # Mantendo o padrão self.model para não haver confusão de nomes
+        self.model = AttentionMIL(in_features=self.emb_dim, hidden_dim=hidden_dim).to(self.device)
         
-        optimizer = AdamW(modelo.parameters(), lr=lr, weight_decay=1e-4)
-        criterion = nn.BCELoss() # Binary Cross Entropy (Exige saídas entre 0 e 1)
+        optimizer = AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
+        criterion = nn.BCELoss() # Binary Cross Entropy
 
         logger.info(f"Treinando por {epochs} épocas...")
         
+        # A MÁGICA PARA ESTABILIZAR O TREINO
+        accumulation_steps = 16 
+
         for epoch in range(epochs):
-            modelo.train()
+            self.model.train()
             loss_acumulada = 0.0
             
-            for bag, label, _ in train_loader:
-                bag, label = bag.to(self.device), label.to(self.device)
+            # Zera o gradiente antes de começar a juntar as bags
+            optimizer.zero_grad() 
+
+            for i, (bag, label, _) in enumerate(train_loader):
+                # Envia para a placa de vídeo
+                bag = bag.to(self.device)
                 
-                optimizer.zero_grad()
-                pred, _ = modelo(bag)
-                loss = criterion(pred, label)
+                # A CORREÇÃO DO ERRO DO FACEBOOK FICA AQUI (Transforma [1] em [1, 1])
+                label = label.to(self.device).unsqueeze(1).float()
+                
+                # ÚNICO Forward Pass
+                pred, _ = self.model(bag)
+                
+                # Calcula a Loss Bruta apenas para a gente ver no Log
+                raw_loss = criterion(pred, label)
+                loss_acumulada += raw_loss.item()
+                
+                # Divide a loss e guarda na memória (Backward)
+                loss = raw_loss / accumulation_steps
                 loss.backward()
-                optimizer.step()
                 
-                loss_acumulada += loss.item()
+                # Só dá o passo de aprendizado após acumular 16 IPs
+                if (i + 1) % accumulation_steps == 0 or (i + 1) == len(train_loader):
+                    optimizer.step()
+                    optimizer.zero_grad()
                 
             loss_media = loss_acumulada / len(train_loader)
             logger.info(f"Época {epoch+1}/{epochs} - Train Loss: {loss_media:.4f}")
 
         logger.info("Treino concluído. Salvando modelo...")
-        self.save_model(modelo, hidden_dim, hash_info, path=path)
+        self.save_model(self.model, hidden_dim, hash_info, path=path)
         logger.info("Pipeline de treinamento finalizado com sucesso!")
 
     def save_model(self, modelo, hidden_dim, hash_info, path):
